@@ -1,0 +1,121 @@
+name: Generate Specs from Issue
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  generate-specs:
+    # Only run if issue has 'spec-request' label
+    if: contains(github.event.issue.labels.*.name, 'spec-request')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          npm install -g @github/spec-kit
+
+      - name: Extract prompt from issue
+        id: extract-prompt
+        run: |
+          # Extract issue body and title
+          TITLE="${{ github.event.issue.title }}"
+          BODY="${{ github.event.issue.body }}"
+
+          # Use title as prompt, or first line of body if title is empty
+          if [ -n "$TITLE" ]; then
+            PROMPT="$TITLE"
+          else
+            PROMPT=$(echo "$BODY" | head -n 1)
+          fi
+
+          echo "prompt=$PROMPT" >> $GITHUB_OUTPUT
+          echo "Extracted prompt: $PROMPT"
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Generate specifications
+        id: generate
+        run: |
+          # Generate specs with jules-specs
+          OUTPUT=$(python -m jules_specs "${{ steps.extract-prompt.outputs.prompt }}" --enhance)
+          echo "$OUTPUT"
+
+          # Extract output directory from jules-specs output
+          SPEC_DIR=$(echo "$OUTPUT" | grep "Output directory:" | sed 's/.*Output directory: //')
+          echo "spec_dir=$SPEC_DIR" >> $GITHUB_OUTPUT
+
+      - name: Get branch name
+        id: branch
+        run: |
+          BRANCH=$(git branch --show-current)
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Push to remote
+        run: |
+          git push -u origin ${{ steps.branch.outputs.branch }}
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create \
+            --title "Specifications: ${{ steps.extract-prompt.outputs.prompt }}" \
+            --body "$(cat <<'EOF'
+          ## Automated Spec Generation
+
+          Generated from issue #${{ github.event.issue.number }}
+
+          **Original Request**: ${{ steps.extract-prompt.outputs.prompt }}
+
+          ### Generated Files
+          - Specification: `${{ steps.generate.outputs.spec_dir }}/spec.md`
+          - Architecture: `${{ steps.generate.outputs.spec_dir }}/architecture.md`
+          - API Documentation: `${{ steps.generate.outputs.spec_dir }}/api.md`
+
+          ### Next Steps
+          1. Review the generated specifications
+          2. Make any necessary adjustments
+          3. Merge this PR
+          4. Run `jules-planner --spec-dir ${{ steps.generate.outputs.spec_dir }}`
+
+          Closes #${{ github.event.issue.number }}
+          EOF
+          )" \
+            --label "specs,automated"
+
+      - name: Comment on issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "✅ Specifications generated successfully! Check the PR for details."
+
+      - name: Comment on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "❌ Failed to generate specifications. Please check the workflow logs."

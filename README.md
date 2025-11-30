@@ -121,6 +121,54 @@ To skip git operations:
 jules-specs --no-commit "Your prompt here"
 ```
 
+## GitHub Actions Integration
+
+Jules-specs can be integrated into GitHub workflows for automated spec generation. See [docs/GITHUB_INTEGRATION.md](docs/GITHUB_INTEGRATION.md) for comprehensive documentation.
+
+### Quick Start
+
+**Method 1: Trigger via Issue Label**
+1. Create an issue with your specification request
+2. Add the `spec-request` label
+3. Specs are auto-generated and a PR is created
+
+**Method 2: Trigger via Comment**
+Comment on any issue:
+```
+/generate-spec Build a photo organizer app
+```
+
+**Method 3: Manual Trigger**
+1. Go to **Actions** → **Generate Specs (Manual)**
+2. Click **Run workflow**
+3. Enter your prompt and options
+4. Click **Run workflow**
+
+### Available Workflows
+
+The repository includes three pre-built workflows:
+
+- **`generate-specs-on-issue.yml`** - Automatically triggered when an issue gets the `spec-request` label
+- **`generate-specs-on-comment.yml`** - Triggered by `/generate-spec` command in issue comments
+- **`generate-specs-manual.yml`** - Manual trigger via GitHub Actions UI
+
+All workflows:
+- Install dependencies (Python, Node.js, spec-kit)
+- Generate specifications using jules-specs
+- Create a new git branch
+- Open a pull request with the results
+- Add helpful comments and notifications
+
+### Setup
+
+1. Copy workflow files to `.github/workflows/` in your repository
+2. Configure repository permissions: **Settings → Actions → General**
+   - Enable "Read and write permissions"
+   - Allow "GitHub Actions to create and approve pull requests"
+3. Create a `spec-request` label in your repository (for issue-triggered workflow)
+
+For detailed setup instructions, advanced usage, and troubleshooting, see [docs/GITHUB_INTEGRATION.md](docs/GITHUB_INTEGRATION.md).
+
 ## Development
 
 ### Running from Source
