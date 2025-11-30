@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/maravedi/jules-specs/blob/main/docs/GITHUB_INTEGRATION.md
+    about: Read the GitHub integration guide
+  - name: 💬 Discussions
+    url: https://github.com/maravedi/jules-specs/discussions
+    about: Ask questions and discuss with the community
+  - name: 🐛 Bug Report
+    url: https://github.com/maravedi/jules-specs/issues/new
+    about: Report a bug or issue with jules-specs

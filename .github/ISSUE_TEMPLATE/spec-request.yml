@@ -1,0 +1,92 @@
+name: 📋 Specification Request
+description: Request automated specification generation
+title: "[Spec]: "
+labels: ["spec-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Specification Request
+
+        This issue will automatically trigger spec generation when created.
+        The specs will be generated using GitHub spec-kit and jules-specs.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: What do you want to build? This will be used as the prompt for spec generation.
+      placeholder: "Example: Build a photo organizer app with ML-based tagging and cloud sync"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: enhancement
+    attributes:
+      label: Jules Enhancement
+      description: Should we add compliance and security considerations?
+      options:
+        - "Yes - Add compliance critique"
+        - "No - Basic spec only"
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Key Requirements
+      description: List any specific requirements or constraints
+      placeholder: |
+        - Must support iOS and Android
+        - CMMC Level 2 compliance required
+        - Multi-tenant architecture
+      value: |
+        -
+        -
+        -
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - "High - Need specs ASAP"
+        - "Medium - Normal timeline"
+        - "Low - Nice to have"
+      default: 1
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful
+      placeholder: Links to related docs, examples, or background information
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched for similar specification requests
+          required: true
+        - label: I have provided a clear description of what needs to be built
+          required: true
+        - label: This request is for specification generation (not implementation)
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ### What happens next?
+
+        1. 🤖 GitHub Actions will automatically generate specifications
+        2. 📁 Specs will be created in `.specify/specs/XXX/`
+        3. 🔀 A pull request will be opened for review
+        4. 💬 You'll receive a comment with the PR link
+        5. ✅ Review and merge the PR
+        6. 🚀 Run `jules-planner` on the generated specs
+
+        **Timeline**: Spec generation typically completes in 2-5 minutes.

@@ -1,0 +1,160 @@
+name: Generate Specs from Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  generate-specs:
+    # Only run if comment contains '/generate-spec'
+    if: |
+      github.event.issue.pull_request == null &&
+      contains(github.event.comment.body, '/generate-spec')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          npm install -g @github/spec-kit
+
+      - name: Extract prompt from comment
+        id: extract-prompt
+        run: |
+          # Extract text after /generate-spec command
+          COMMENT="${{ github.event.comment.body }}"
+          PROMPT=$(echo "$COMMENT" | sed -n 's|.*/generate-spec\s*\(.*\)|\1|p' | head -n 1)
+
+          # If no prompt after command, use issue title
+          if [ -z "$PROMPT" ]; then
+            PROMPT="${{ github.event.issue.title }}"
+          fi
+
+          echo "prompt=$PROMPT" >> $GITHUB_OUTPUT
+          echo "Extracted prompt: $PROMPT"
+
+      - name: React to comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Add eyes emoji to indicate we're processing
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -f content='eyes'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Generate specifications
+        id: generate
+        run: |
+          OUTPUT=$(python -m jules_specs "${{ steps.extract-prompt.outputs.prompt }}" --enhance)
+          echo "$OUTPUT"
+
+          SPEC_DIR=$(echo "$OUTPUT" | grep "Output directory:" | sed 's/.*Output directory: //')
+          echo "spec_dir=$SPEC_DIR" >> $GITHUB_OUTPUT
+
+      - name: Get branch name
+        id: branch
+        run: |
+          BRANCH=$(git branch --show-current)
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Push to remote
+        run: |
+          git push -u origin ${{ steps.branch.outputs.branch }}
+
+      - name: Create Pull Request
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_URL=$(gh pr create \
+            --title "Specifications: ${{ steps.extract-prompt.outputs.prompt }}" \
+            --body "$(cat <<'EOF'
+          ## Automated Spec Generation
+
+          Generated from issue #${{ github.event.issue.number }} (comment)
+
+          **Original Request**: ${{ steps.extract-prompt.outputs.prompt }}
+
+          ### Generated Files
+          - 📋 Specification: `${{ steps.generate.outputs.spec_dir }}/spec.md`
+          - 🏗️ Architecture: `${{ steps.generate.outputs.spec_dir }}/architecture.md`
+          - 🔌 API: `${{ steps.generate.outputs.spec_dir }}/api.md`
+
+          ### Next Steps
+          1. Review the generated specifications
+          2. Make any necessary adjustments
+          3. Merge this PR
+          4. Run `jules-planner --spec-dir ${{ steps.generate.outputs.spec_dir }}`
+
+          Related to #${{ github.event.issue.number }}
+          EOF
+          )" \
+            --label "specs,automated")
+
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+
+      - name: Comment on issue with success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "✅ Specifications generated successfully!
+
+          **PR**: ${{ steps.create-pr.outputs.pr_url }}
+          **Output**: \`${{ steps.generate.outputs.spec_dir }}\`
+
+          The specifications are ready for review."
+
+      - name: React with success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -f content='+1'
+
+      - name: Comment on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "❌ Failed to generate specifications. Please check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+
+      - name: React with failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            -f content='-1'
